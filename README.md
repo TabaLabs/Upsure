@@ -14,7 +14,7 @@ Easy, reliable file uploads that resume after a disconnect. Built on the open [t
 
 ## Development
 
-Requires Node 18+ and [pnpm](https://pnpm.io).
+Requires Node 20+ and [pnpm](https://pnpm.io).
 
 ```sh
 pnpm install

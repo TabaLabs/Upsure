@@ -30,7 +30,7 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "publishConfig": {
     "access": "public"
@@ -38,6 +38,13 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tus/file-store": "^2.1.1",
+    "@tus/server": "^2.4.5"
+  },
+  "devDependencies": {
+    "tus-js-client": "^4.3.1"
   }
 }
