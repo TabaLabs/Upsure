@@ -1,0 +1,10 @@
+packages:
+  - "packages/*"
+  - "examples/*"
+
+allowBuilds:
+  esbuild: true
+
+# vitest 3 would otherwise pull in vite 7, which dropped Node 18.
+overrides:
+  vite: ^6.4.4
