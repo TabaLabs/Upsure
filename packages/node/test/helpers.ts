@@ -10,39 +10,56 @@ import { createUpsureServer, type UpsureServer, type UpsureServerOptions } from 
 export interface TestServer {
   /** Full URL of the upload endpoint. */
   endpoint: string;
+  port: number;
   /** Temporary folder the uploads are written to. */
   directory: string;
   upsure: UpsureServer;
+  /** Shuts the server down completely. Also done automatically after the test. */
+  stop(): Promise<void>;
 }
 
 const cleanups: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
+
+/** Registers teardown work to run after the current test. */
+export function onCleanup(cleanup: () => Promise<void>): void {
+  cleanups.push(cleanup);
+}
 
 /**
  * Starts an Upsure server on a free port. It is torn down after the test.
+ * Pass `directory` to reuse the storage folder of an earlier server.
  * `mount` can wrap the handler in an app (e.g. Express) instead of serving it directly.
  */
 export async function startServer(
-  options: Omit<UpsureServerOptions, "path" | "directory"> = {},
+  options: Omit<UpsureServerOptions, "path" | "directory"> & { directory?: string } = {},
   mount: (upsure: UpsureServer) => RequestListener = (upsure) => upsure.handle,
 ): Promise<TestServer> {
-  const directory = await mkdtemp(join(tmpdir(), "upsure-node-"));
+  const directory = options.directory ?? (await mkdtemp(join(tmpdir(), "upsure-node-")));
   const upsure = createUpsureServer({ ...options, path: "/uploads", directory });
   const server = createServer(mount(upsure));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
 
-  cleanups.push(async () => {
-    server.closeAllConnections();
-    await new Promise((resolve) => server.close(resolve));
-    await upsure.close();
+  let stopped: Promise<void> | undefined;
+  const stop = () => {
+    stopped ??= (async () => {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+      await upsure.close();
+    })();
+    return stopped;
+  };
+
+  onCleanup(async () => {
+    await stop();
     await rm(directory, { recursive: true, force: true });
   });
 
-  return { endpoint: `http://127.0.0.1:${port}/uploads`, directory, upsure };
+  return { endpoint: `http://127.0.0.1:${port}/uploads`, port, directory, upsure, stop };
 }
 
 /** Uploads a buffer with tus-js-client and resolves with the upload URL. */
