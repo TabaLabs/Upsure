@@ -38,6 +38,9 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
   }
 }
