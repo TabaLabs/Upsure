@@ -1,17 +1,18 @@
 import { mkdtemp, rm } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type RequestListener } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Upload, type UploadOptions } from "tus-js-client";
 import { afterEach } from "vitest";
-import { createUpsureServer, type UpsureServerOptions } from "../src/index";
+import { createUpsureServer, type UpsureServer, type UpsureServerOptions } from "../src/index";
 
 export interface TestServer {
   /** Full URL of the upload endpoint. */
   endpoint: string;
   /** Temporary folder the uploads are written to. */
   directory: string;
+  upsure: UpsureServer;
 }
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -20,23 +21,28 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 
-/** Starts an Upsure server on a free port. It is torn down after the test. */
+/**
+ * Starts an Upsure server on a free port. It is torn down after the test.
+ * `mount` can wrap the handler in an app (e.g. Express) instead of serving it directly.
+ */
 export async function startServer(
   options: Omit<UpsureServerOptions, "path" | "directory"> = {},
+  mount: (upsure: UpsureServer) => RequestListener = (upsure) => upsure.handle,
 ): Promise<TestServer> {
   const directory = await mkdtemp(join(tmpdir(), "upsure-node-"));
   const upsure = createUpsureServer({ ...options, path: "/uploads", directory });
-  const server = createServer(upsure.handle);
+  const server = createServer(mount(upsure));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
 
   cleanups.push(async () => {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+    await upsure.close();
     await rm(directory, { recursive: true, force: true });
   });
 
-  return { endpoint: `http://127.0.0.1:${port}/uploads`, directory };
+  return { endpoint: `http://127.0.0.1:${port}/uploads`, directory, upsure };
 }
 
 /** Uploads a buffer with tus-js-client and resolves with the upload URL. */

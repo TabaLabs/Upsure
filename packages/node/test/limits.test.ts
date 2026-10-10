@@ -118,7 +118,7 @@ describe("onUploadComplete", () => {
 
     const url = await upload(endpoint, data, {
       chunkSize: 100 * 1024,
-      metadata: { filename: "holiday.png", filetype: "image/png", album: "summer" },
+      metadata: { filename: "holiday.zip", filetype: "application/zip", album: "summer" },
     });
 
     const id = url.split("/").pop() as string;
@@ -126,11 +126,11 @@ describe("onUploadComplete", () => {
     const file = onUploadComplete.mock.calls[0]?.[0] as CompletedUpload;
     expect(file).toEqual({
       id,
-      name: "holiday.png",
-      type: "image/png",
+      name: "holiday.zip",
+      type: "application/zip",
       size: data.length,
       path: join(directory, id),
-      metadata: { filename: "holiday.png", filetype: "image/png", album: "summer" },
+      metadata: { filename: "holiday.zip", filetype: "application/zip", album: "summer" },
     });
     expect(isAbsolute(file.path)).toBe(true);
     expect((await readFile(file.path)).equals(data)).toBe(true);
