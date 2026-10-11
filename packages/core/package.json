@@ -37,10 +37,15 @@
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"
   },
   "devDependencies": {
+    "@tabalabs/upsure-node": "workspace:*",
+    "@types/node": "^20.19.43",
     "jsdom": "^29.1.1"
+  },
+  "dependencies": {
+    "tus-js-client": "^4.3.1"
   }
 }

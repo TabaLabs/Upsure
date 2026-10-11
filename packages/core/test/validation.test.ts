@@ -17,7 +17,7 @@ describe("createUploader", () => {
   });
 
   test("accepts any non-empty file when no limits are set", () => {
-    const { accepted, rejected } = createUploader({ endpoint }).addFiles([
+    const { accepted, rejected } = createUploader({ endpoint, autoStart: false }).addFiles([
       makeFile("a.exe", "application/x-msdownload"),
       makeFile("no-type"),
     ]);
@@ -29,7 +29,7 @@ describe("createUploader", () => {
 
 describe("addFiles input", () => {
   test("accepts an array of File", () => {
-    const { accepted } = createUploader({ endpoint }).addFiles([makeFile("a.txt", "text/plain")]);
+    const { accepted } = createUploader({ endpoint, autoStart: false }).addFiles([makeFile("a.txt", "text/plain")]);
 
     expect(accepted).toHaveLength(1);
   });
@@ -38,7 +38,7 @@ describe("addFiles input", () => {
     const list = makeFileList([makeFile("a.txt", "text/plain"), makeFile("b.txt", "text/plain")]);
     expect(list).toBeInstanceOf(FileList);
 
-    const { accepted } = createUploader({ endpoint }).addFiles(list);
+    const { accepted } = createUploader({ endpoint, autoStart: false }).addFiles(list);
 
     expect(accepted.map((file) => file.name)).toEqual(["a.txt", "b.txt"]);
   });
@@ -46,7 +46,7 @@ describe("addFiles input", () => {
   test("returns the rejected file itself with its reason", () => {
     const empty = makeFile("empty.txt", "text/plain", 0);
 
-    const { accepted, rejected } = createUploader({ endpoint }).addFiles([empty]);
+    const { accepted, rejected } = createUploader({ endpoint, autoStart: false }).addFiles([empty]);
 
     expect(accepted).toEqual([]);
     expect(rejected).toEqual([{ file: empty, reason: "empty" }]);
@@ -54,7 +54,7 @@ describe("addFiles input", () => {
   });
 
   test("sorts a mixed batch into accepted and rejected", () => {
-    const uploader = createUploader({ endpoint, allowedTypes: ["image/*"], maxFileSize: 1000 });
+    const uploader = createUploader({ endpoint, autoStart: false, allowedTypes: ["image/*"], maxFileSize: 1000 });
 
     const { accepted, rejected } = uploader.addFiles([
       makeFile("ok.png", "image/png", 500),
@@ -75,18 +75,18 @@ describe("addFiles input", () => {
 
 describe("empty files", () => {
   test("a zero-byte file is rejected as empty", () => {
-    expect(reasonFor({ endpoint }, makeFile("empty.txt", "text/plain", 0))).toBe("empty");
+    expect(reasonFor({ endpoint, autoStart: false }, makeFile("empty.txt", "text/plain", 0))).toBe("empty");
   });
 
   test("empty wins over the other reasons", () => {
-    const options = { endpoint, allowedTypes: ["image/*"], maxFiles: 0 };
+    const options = { endpoint, autoStart: false, allowedTypes: ["image/*"], maxFiles: 0 };
 
     expect(reasonFor(options, makeFile("empty.txt", "text/plain", 0))).toBe("empty");
   });
 });
 
 describe("allowedTypes", () => {
-  const options = { endpoint, allowedTypes: ["image/*", "application/pdf", ".zip"] };
+  const options = { endpoint, autoStart: false, allowedTypes: ["image/*", "application/pdf", ".zip"] };
 
   test.each([
     ["a MIME wildcard", makeFile("photo.png", "image/png")],
@@ -111,19 +111,19 @@ describe("allowedTypes", () => {
   });
 
   test("patterns are case-insensitive and trimmed", () => {
-    const loose = { endpoint, allowedTypes: [" IMAGE/* ", ".ZIP"] };
+    const loose = { endpoint, autoStart: false, allowedTypes: [" IMAGE/* ", ".ZIP"] };
 
     expect(reasonFor(loose, makeFile("photo.png", "image/png"))).toBeNull();
     expect(reasonFor(loose, makeFile("archive.zip"))).toBeNull();
   });
 
   test("an empty list rejects everything", () => {
-    expect(reasonFor({ endpoint, allowedTypes: [] }, makeFile("a.png", "image/png"))).toBe("type");
+    expect(reasonFor({ endpoint, autoStart: false, allowedTypes: [] }, makeFile("a.png", "image/png"))).toBe("type");
   });
 });
 
 describe("maxFileSize", () => {
-  const options = { endpoint, maxFileSize: 1000 };
+  const options = { endpoint, autoStart: false, maxFileSize: 1000 };
 
   test("accepts a file exactly at the limit", () => {
     expect(reasonFor(options, makeFile("a.bin", "", 1000))).toBeNull();
@@ -134,7 +134,7 @@ describe("maxFileSize", () => {
   });
 
   test("type is reported before size", () => {
-    const both = { endpoint, maxFileSize: 1000, allowedTypes: ["image/*"] };
+    const both = { endpoint, autoStart: false, maxFileSize: 1000, allowedTypes: ["image/*"] };
 
     expect(reasonFor(both, makeFile("big.txt", "text/plain", 5000))).toBe("type");
   });
@@ -142,7 +142,7 @@ describe("maxFileSize", () => {
 
 describe("maxFiles", () => {
   test("rejects the files over the limit within one call", () => {
-    const uploader = createUploader({ endpoint, maxFiles: 2 });
+    const uploader = createUploader({ endpoint, autoStart: false, maxFiles: 2 });
 
     const { accepted, rejected } = uploader.addFiles([
       makeFile("1.txt"),
@@ -157,7 +157,7 @@ describe("maxFiles", () => {
   });
 
   test("counts files across several addFiles calls", () => {
-    const uploader = createUploader({ endpoint, maxFiles: 3 });
+    const uploader = createUploader({ endpoint, autoStart: false, maxFiles: 3 });
 
     expect(uploader.addFiles([makeFile("1.txt"), makeFile("2.txt")]).accepted).toHaveLength(2);
     const second = uploader.addFiles([makeFile("3.txt"), makeFile("4.txt")]);
@@ -170,7 +170,7 @@ describe("maxFiles", () => {
   });
 
   test("files rejected for another reason don't use up a slot", () => {
-    const uploader = createUploader({ endpoint, maxFiles: 2, allowedTypes: [".txt"] });
+    const uploader = createUploader({ endpoint, autoStart: false, maxFiles: 2, allowedTypes: [".txt"] });
 
     const { accepted } = uploader.addFiles([
       makeFile("a.exe"),
@@ -183,7 +183,7 @@ describe("maxFiles", () => {
   });
 
   test("removing a file frees a slot", () => {
-    const uploader = createUploader({ endpoint, maxFiles: 1 });
+    const uploader = createUploader({ endpoint, autoStart: false, maxFiles: 1 });
     const [first] = uploader.addFiles([makeFile("1.txt")]).accepted;
     expect(uploader.addFiles([makeFile("2.txt")]).rejected[0]?.reason).toBe("too-many-files");
 

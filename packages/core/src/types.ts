@@ -10,7 +10,33 @@ export interface UploaderOptions {
   allowedTypes?: string[];
   /** Most files the uploader holds at once. */
   maxFiles?: number;
+  /** Size of each upload request in bytes. Defaults to 5 MB. */
+  chunkSize?: number;
+  /** How many files upload at the same time. Defaults to 3. */
+  parallelUploads?: number;
+  /** Start uploading files as soon as they are added. Defaults to `true`. */
+  autoStart?: boolean;
+  /**
+   * Delays in milliseconds between automatic retries of a failed request.
+   * Defaults to `[0, 1000, 3000, 5000, 10000, 20000]`.
+   */
+  retryDelays?: number[];
+  /**
+   * Extra headers for every upload request, e.g. an auth token. A function is
+   * called before each request, so it can return a fresh token.
+   */
+  headers?: Record<string, string> | (() => Record<string, string> | Promise<Record<string, string>>);
+  /**
+   * Extra metadata sent with each upload. `filename` and `filetype` are
+   * always sent and can't be overridden.
+   */
+  metadata?: Record<string, string> | ((file: File) => Record<string, string>);
+  /** Called when a file has been fully uploaded. */
+  onComplete?: (file: FileState) => void;
+  /** Called when an upload fails for good, after the automatic retries. */
+  onError?: (file: FileState, error: Error) => void;
 }
+
 
 export type FileStatus = "queued" | "uploading" | "paused" | "complete" | "error";
 
@@ -26,6 +52,15 @@ export interface FileState {
   /** Upload progress from 0 to 1. */
   progress: number;
   bytesUploaded: number;
+  /** URL of the upload on the server. Set once the upload is complete. */
+  url?: string;
+  /** Why the upload failed. Set when `status` is `"error"`. */
+  error?: string;
+  /**
+   * Set when `status` is `"error"`: `true` when the server never answered (a
+   * network problem), `false` when the server rejected the upload.
+   */
+  retryable?: boolean;
 }
 
 export interface UploaderState {
@@ -51,14 +86,19 @@ export interface AddFilesResult {
 export interface Uploader {
   /** Validates the files and queues the ones that pass. */
   addFiles(files: FileList | File[]): AddFilesResult;
+  /**
+   * Starts uploading one queued file, or all queued files when no id is given.
+   * Files wait their turn when `parallelUploads` are already running.
+   */
+  start(id?: string): void;
   /** Current state. The same object is returned until something changes. */
   getState(): UploaderState;
   /** Calls `listener` after every state change. Returns a function that unsubscribes. */
   subscribe(listener: () => void): () => void;
-  /** Removes one file. */
+  /** Removes one file. An upload in progress is stopped. */
   remove(id: string): void;
-  /** Removes all files. */
+  /** Removes all files. Uploads in progress are stopped. */
   clear(): void;
-  /** Removes all files and all listeners. */
+  /** Removes all files and all listeners. Uploads in progress are stopped. */
   destroy(): void;
 }
