@@ -1,76 +1,19 @@
-import type { UploadOptions } from "tus-js-client";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createUploader } from "../src/index";
+import { flush, networkError, resetTus, serverError, succeed, tus, uploadOf } from "./fake-tus";
 import { makeFile } from "./helpers";
 
-/** Stand-in for tus-js-client's Upload. Tests drive it through `options`. */
-interface FakeUpload {
-  file: File;
-  options: UploadOptions;
-  url: string | null;
-  start: ReturnType<typeof vi.fn>;
-  abort: ReturnType<typeof vi.fn>;
-}
+vi.mock("tus-js-client", () => import("./fake-tus"));
 
-const tus = vi.hoisted(() => ({ uploads: [] as FakeUpload[], startError: null as Error | null }));
-
-vi.mock("tus-js-client", () => ({
-  Upload: class {
-    url: string | null = null;
-    start = vi.fn(() => {
-      if (tus.startError) throw tus.startError;
-    });
-    abort = vi.fn(() => Promise.resolve());
-    constructor(
-      public file: File,
-      public options: UploadOptions,
-    ) {
-      tus.uploads.push(this as unknown as FakeUpload);
-    }
-  },
-}));
-
-beforeEach(() => {
-  tus.uploads.length = 0;
-  tus.startError = null;
-});
+beforeEach(resetTus);
 
 const endpoint = "https://example.test/uploads";
-
-/** The fake tus upload created for a file name. */
-function uploadOf(name: string): FakeUpload {
-  const upload = tus.uploads.find((candidate) => candidate.file.name === name);
-  if (!upload) throw new Error(`No upload was started for ${name}`);
-  return upload;
-}
-
-function succeed(name: string, url = `${endpoint}/${name}`): void {
-  const upload = uploadOf(name);
-  upload.url = url;
-  upload.options.onSuccess?.({ lastResponse: undefined as never });
-}
-
-/** A tus error for a request the server answered with `status`. */
-function serverError(status: number, body: string): Error {
-  return Object.assign(new Error(`tus: unexpected response, response code: ${status}`), {
-    originalRequest: {},
-    originalResponse: { getStatus: () => status, getBody: () => body },
-  });
-}
-
-/** A tus error for a request that never got a response. */
-function networkError(): Error {
-  return Object.assign(new Error("tus: failed to upload chunk at offset 0"), {
-    originalRequest: {},
-    originalResponse: null,
-  });
-}
 
 const statuses = (uploader: ReturnType<typeof createUploader>) =>
   Object.fromEntries(uploader.getState().files.map((file) => [file.name, file.status]));
 
 describe("starting", () => {
-  test("files start as soon as they are added by default", () => {
+  test("files start as soon as they are added by default", async () => {
     const uploader = createUploader({ endpoint });
     const file = makeFile("a.txt", "text/plain");
 
@@ -80,6 +23,7 @@ describe("starting", () => {
     expect(uploader.getState().files[0]?.status).toBe("uploading");
     expect(tus.uploads).toHaveLength(1);
     expect(uploadOf("a.txt").file).toBe(file);
+    await flush();
     expect(uploadOf("a.txt").start).toHaveBeenCalledTimes(1);
   });
 
@@ -403,12 +347,13 @@ describe("errors", () => {
     expect(onError).toHaveBeenCalledWith(file, error);
   });
 
-  test("an upload that can't even start is an error that is not retryable", () => {
+  test("an upload that can't even start is an error that is not retryable", async () => {
     tus.startError = new Error("tus: no file or stream to upload provided");
     const onError = vi.fn();
     const uploader = createUploader({ endpoint, onError });
 
     uploader.addFiles([makeFile("a.bin")]);
+    await flush();
 
     expect(uploader.getState().files[0]).toMatchObject({
       status: "error",

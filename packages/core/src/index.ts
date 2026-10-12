@@ -1,4 +1,4 @@
-import { type DetailedError, Upload } from "tus-js-client";
+import { type DetailedError, type PreviousUpload, Upload } from "tus-js-client";
 import type {
   FileState,
   RejectedFile,
@@ -47,20 +47,45 @@ function describeError(error: Error | DetailedError): { message: string; retryab
   return { message: error.message, retryable: false };
 }
 
+/** What the uploader keeps for every file in the state. */
+interface Entry {
+  file: File;
+  /** The tus upload. Created on the first start and reused, so it resumes instead of restarting. */
+  upload?: Upload;
+  /** Settles when the upload may be started: after the lookup of a previous upload, or a pause. */
+  ready?: Promise<unknown>;
+}
+
+/** The most recently created of the stored uploads of a file. */
+function latest(previous: PreviousUpload[]): PreviousUpload | undefined {
+  return [...previous].sort(
+    (a, b) => new Date(b.creationTime).getTime() - new Date(a.creationTime).getTime(),
+  )[0];
+}
+
+/** A copy of the file state without the fields that describe a failure. */
+function withoutError({ error, retryable, ...file }: FileState): FileState {
+  return file;
+}
+
 export function createUploader(options: UploaderOptions): Uploader {
   if (!options?.endpoint) {
     throw new Error("Upsure: the `endpoint` option is required.");
   }
   const parallelUploads = options.parallelUploads ?? DEFAULT_PARALLEL_UPLOADS;
+  const resumeAfterReload = options.resumeAfterReload ?? true;
+  const previews =
+    (options.previews ?? true) &&
+    typeof URL !== "undefined" &&
+    typeof URL.createObjectURL === "function";
 
   let state: UploaderState = { files: [] };
-  /** The original File of every file in the state, by id. */
-  const sources = new Map<string, File>();
+  const entries = new Map<string, Entry>();
   const listeners = new Set<() => void>();
   /** Queued files that were asked to start and wait for a free slot. */
   const waiting = new Set<string>();
-  /** The running tus upload of every file that is uploading, by id. */
-  const running = new Map<string, Upload>();
+  /** Files that are uploading right now. */
+  const running = new Set<string>();
 
   /** Replaces the state with a new object and tells the listeners. */
   function setFiles(files: FileState[]): void {
@@ -68,12 +93,17 @@ export function createUploader(options: UploaderOptions): Uploader {
     for (const listener of [...listeners]) listener();
   }
 
+  const getFile = (id: string) => state.files.find((file) => file.id === id);
+
   /** Applies a change to one file. Returns the new file state. */
-  function updateFile(id: string, patch: Partial<FileState>): FileState | undefined {
+  function updateFile(
+    id: string,
+    change: Partial<FileState> | ((file: FileState) => FileState),
+  ): FileState | undefined {
     let updated: FileState | undefined;
     const files = state.files.map((file) => {
       if (file.id !== id) return file;
-      updated = { ...file, ...patch };
+      updated = typeof change === "function" ? change(file) : { ...file, ...change };
       return updated;
     });
     if (updated) setFiles(files);
@@ -91,10 +121,11 @@ export function createUploader(options: UploaderOptions): Uploader {
     return metadata;
   }
 
-  function begin(id: string, file: File): void {
+  function createUpload(id: string, entry: Entry): Upload {
+    const { file } = entry;
     const { headers } = options;
-    /** False once this upload has ended or the file was removed. */
-    const isCurrent = () => running.get(id) === upload;
+    /** False while the file is paused, and once it has ended or was removed. */
+    const isCurrent = () => running.has(id) && entries.get(id) === entry;
 
     const finish = (patch: Partial<FileState>): FileState | undefined => {
       running.delete(id);
@@ -103,19 +134,14 @@ export function createUploader(options: UploaderOptions): Uploader {
       return updated;
     };
 
-    const fail = (error: Error | DetailedError): void => {
-      const { message, retryable } = describeError(error);
-      const updated = finish({ status: "error", error: message, retryable });
-      if (updated) options.onError?.(updated, error);
-    };
-
     const upload = new Upload(file, {
       endpoint: options.endpoint,
       chunkSize: options.chunkSize ?? DEFAULT_CHUNK_SIZE,
       retryDelays: options.retryDelays ?? DEFAULT_RETRY_DELAYS,
       metadata: buildMetadata(file),
       headers: typeof headers === "function" ? {} : (headers ?? {}),
-      storeFingerprintForResuming: false,
+      storeFingerprintForResuming: resumeAfterReload,
+      removeFingerprintOnSuccess: true,
       async onBeforeRequest(request) {
         if (typeof headers !== "function") return;
         for (const [name, value] of Object.entries(await headers())) {
@@ -140,41 +166,91 @@ export function createUploader(options: UploaderOptions): Uploader {
         if (updated) options.onComplete?.(updated);
       },
       onError(error) {
-        if (isCurrent()) fail(error);
+        if (!isCurrent()) return;
+        const { message, retryable } = describeError(error);
+        const updated = finish({ status: "error", error: message, retryable });
+        if (updated) options.onError?.(updated, error);
       },
     });
 
-    running.set(id, upload);
-    updateFile(id, { status: "uploading" });
-    try {
-      upload.start();
-    } catch (error) {
-      if (isCurrent()) fail(error instanceof Error ? error : new Error(String(error)));
+    if (resumeAfterReload) {
+      // If this file was being uploaded before a page reload, continue that upload.
+      entry.ready = upload
+        .findPreviousUploads()
+        .then((previous) => {
+          const match = latest(previous);
+          if (match) upload.resumeFromPreviousUpload(match);
+        })
+        .catch(() => {});
     }
+    return upload;
+  }
+
+  /**
+   * Starts or continues the upload of a file. The tus upload is reused, so a
+   * paused or failed file continues from the offset the server has.
+   */
+  function begin(id: string, entry: Entry): void {
+    running.add(id);
+    updateFile(id, (file) => ({ ...withoutError(file), status: "uploading" }));
+
+    entry.upload ??= createUpload(id, entry);
+    const { upload } = entry;
+    const launch = () => {
+      // Paused or removed while waiting.
+      if (!running.has(id) || entries.get(id) !== entry) return;
+      try {
+        upload.start();
+      } catch (error) {
+        upload.options.onError?.(error instanceof Error ? error : new Error(String(error)));
+      }
+    };
+    if (entry.ready) entry.ready.then(launch);
+    else launch();
   }
 
   /** Starts waiting files, in the order they were added, while there are free slots. */
   function startNext(): void {
     for (const { id } of state.files) {
       if (running.size >= parallelUploads) return;
-      const file = sources.get(id);
-      if (file && waiting.delete(id)) begin(id, file);
+      const entry = entries.get(id);
+      if (entry && waiting.delete(id)) begin(id, entry);
     }
   }
 
-  /** Stops the upload of a file, if any, without telling the server. */
-  function stop(id: string): void {
-    waiting.delete(id);
-    const upload = running.get(id);
-    if (!upload) return;
-    running.delete(id);
-    upload.abort().catch(() => {});
+  /** Puts paused or failed files back in line for a free slot. */
+  function enqueue(ids: string[]): void {
+    for (const id of ids) {
+      waiting.add(id);
+      updateFile(id, (file) => ({ ...withoutError(file), status: "queued" }));
+    }
+    startNext();
   }
 
-  function stopAll(): void {
-    for (const id of [...sources.keys()]) stop(id);
-    sources.clear();
+  /**
+   * Stops the upload of a file and forgets the file. With `terminate`, an
+   * unfinished upload is also deleted from the server.
+   */
+  function discard(id: string, terminate = false): void {
+    const entry = entries.get(id);
+    if (!entry) return;
+    const file = getFile(id);
+    waiting.delete(id);
+    running.delete(id);
+    entries.delete(id);
+    entry.upload?.abort(terminate && file?.status !== "complete").catch(() => {});
+    if (file?.previewUrl) URL.revokeObjectURL(file.previewUrl);
   }
+
+  /** Retries the files that failed because the network was down. */
+  function retryAfterReconnect(): void {
+    enqueue(
+      state.files.filter((file) => file.status === "error" && file.retryable).map(({ id }) => id),
+    );
+  }
+
+  const hasWindow = typeof window !== "undefined";
+  if (hasWindow) window.addEventListener("online", retryAfterReconnect);
 
   return {
     addFiles(files) {
@@ -188,8 +264,8 @@ export function createUploader(options: UploaderOptions): Uploader {
           continue;
         }
         const id = createId();
-        sources.set(id, file);
-        accepted.push({
+        entries.set(id, { file });
+        const fileState: FileState = {
           id,
           name: file.name,
           size: file.size,
@@ -197,7 +273,11 @@ export function createUploader(options: UploaderOptions): Uploader {
           status: "queued",
           progress: 0,
           bytesUploaded: 0,
-        });
+        };
+        if (previews && file.type.startsWith("image/")) {
+          fileState.previewUrl = URL.createObjectURL(file);
+        }
+        accepted.push(fileState);
       }
 
       if (accepted.length > 0) {
@@ -219,6 +299,35 @@ export function createUploader(options: UploaderOptions): Uploader {
       startNext();
     },
 
+    pause(id) {
+      const status = getFile(id)?.status;
+      if (status !== "uploading" && status !== "queued") return;
+      waiting.delete(id);
+      running.delete(id);
+      const entry = entries.get(id);
+      if (entry?.upload) {
+        // A later resume waits until the running request has really stopped.
+        entry.ready = Promise.all([entry.ready, entry.upload.abort().catch(() => {})]);
+      }
+      updateFile(id, { status: "paused" });
+      startNext();
+    },
+
+    resume(id) {
+      if (getFile(id)?.status === "paused") enqueue([id]);
+    },
+
+    retry(id) {
+      if (getFile(id)?.status === "error") enqueue([id]);
+    },
+
+    cancel(id) {
+      if (!entries.has(id)) return;
+      discard(id, true);
+      setFiles(state.files.filter((file) => file.id !== id));
+      startNext();
+    },
+
     getState: () => state,
 
     subscribe(listener) {
@@ -229,22 +338,22 @@ export function createUploader(options: UploaderOptions): Uploader {
     },
 
     remove(id) {
-      if (!sources.has(id)) return;
-      stop(id);
-      sources.delete(id);
+      if (!entries.has(id)) return;
+      discard(id);
       setFiles(state.files.filter((file) => file.id !== id));
       startNext();
     },
 
     clear() {
       if (state.files.length === 0) return;
-      stopAll();
+      for (const id of [...entries.keys()]) discard(id);
       setFiles([]);
     },
 
     destroy() {
+      if (hasWindow) window.removeEventListener("online", retryAfterReconnect);
       listeners.clear();
-      stopAll();
+      for (const id of [...entries.keys()]) discard(id);
       state = { files: [] };
     },
   };

@@ -1,36 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { createUpsureServer, type UpsureServerOptions } from "@tabalabs/upsure-node";
-import { afterEach, expect, test } from "vitest";
+import { readdir } from "node:fs/promises";
+import { expect, test } from "vitest";
 import { createUploader, type FileState, type UploaderOptions } from "../src/index";
-
-const cleanups: Array<() => Promise<void>> = [];
-
-afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
-});
-
-/** Starts a real Upsure server on a free port. It is torn down after the test. */
-async function startServer(options: Partial<UpsureServerOptions> = {}) {
-  const directory = await mkdtemp(join(tmpdir(), "upsure-core-"));
-  const upsure = createUpsureServer({ ...options, path: "/uploads", directory });
-  const server = createServer(upsure.handle);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address() as AddressInfo;
-
-  cleanups.push(async () => {
-    server.closeAllConnections();
-    await new Promise((resolve) => server.close(resolve));
-    await upsure.close();
-    await rm(directory, { recursive: true, force: true });
-  });
-
-  return { endpoint: `http://127.0.0.1:${port}/uploads`, directory };
-}
+import { startServer } from "./server";
 
 /** Uploads one file through createUploader and resolves with its final state. */
 function uploadFile(file: File, options: UploaderOptions) {
@@ -51,7 +23,7 @@ function uploadFile(file: File, options: UploaderOptions) {
 }
 
 test("a file uploaded through createUploader arrives byte for byte", async () => {
-  const { endpoint, directory } = await startServer();
+  const { endpoint, stored } = await startServer();
   const data = randomBytes(300 * 1024);
   const file = new File([new Uint8Array(data)], "random.bin", { type: "application/octet-stream" });
 
@@ -68,9 +40,7 @@ test("a file uploaded through createUploader arrives byte for byte", async () =>
   });
   expect(result.file.url).toMatch(new RegExp(`^${endpoint}/[0-9a-f]+$`));
 
-  const id = (result.file.url as string).split("/").pop() as string;
-  const stored = await readFile(join(directory, id));
-  expect(stored.equals(data)).toBe(true);
+  expect((await stored(result.file.url as string)).equals(data)).toBe(true);
 
   // It went queued → uploading → complete, with progress in between.
   const statuses = result.seen.map((state) => state.status);
@@ -115,9 +85,9 @@ test("a 415 rejection gives status error with retryable false", async () => {
 });
 
 test("a server that can't be reached gives status error with retryable true", async () => {
-  const { endpoint } = await startServer();
+  const { endpoint, stop } = await startServer();
   // Shut the server down, so the address is known to be dead.
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  await stop();
   const file = new File(["hello"], "hello.txt", { type: "text/plain" });
 
   const result = await uploadFile(file, { endpoint });

@@ -8,14 +8,14 @@ describe("file state", () => {
   test("an accepted file starts queued with zero progress", () => {
     const uploader = createUploader({ endpoint, autoStart: false });
 
-    const { accepted } = uploader.addFiles([makeFile("photo.png", "image/png", 2048)]);
+    const { accepted } = uploader.addFiles([makeFile("notes.txt", "text/plain", 2048)]);
 
     expect(accepted).toEqual([
       {
         id: expect.any(String),
-        name: "photo.png",
+        name: "notes.txt",
         size: 2048,
-        type: "image/png",
+        type: "text/plain",
         status: "queued",
         progress: 0,
         bytesUploaded: 0,

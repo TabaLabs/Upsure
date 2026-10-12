@@ -31,12 +31,18 @@ export interface UploaderOptions {
    * always sent and can't be overridden.
    */
   metadata?: Record<string, string> | ((file: File) => Record<string, string>);
+  /**
+   * Remember unfinished uploads in `localStorage`, so adding the same file
+   * again after a page reload continues from where it stopped. Defaults to `true`.
+   */
+  resumeAfterReload?: boolean;
+  /** Give image files a `previewUrl`. Defaults to `true`. */
+  previews?: boolean;
   /** Called when a file has been fully uploaded. */
   onComplete?: (file: FileState) => void;
   /** Called when an upload fails for good, after the automatic retries. */
   onError?: (file: FileState, error: Error) => void;
 }
-
 
 export type FileStatus = "queued" | "uploading" | "paused" | "complete" | "error";
 
@@ -52,6 +58,8 @@ export interface FileState {
   /** Upload progress from 0 to 1. */
   progress: number;
   bytesUploaded: number;
+  /** Object URL of an image file, for use as an `<img>` source. */
+  previewUrl?: string;
   /** URL of the upload on the server. Set once the upload is complete. */
   url?: string;
   /** Why the upload failed. Set when `status` is `"error"`. */
@@ -91,11 +99,22 @@ export interface Uploader {
    * Files wait their turn when `parallelUploads` are already running.
    */
   start(id?: string): void;
+  /** Pauses a file that is uploading or queued. Its progress is kept. */
+  pause(id: string): void;
+  /** Continues a paused file from where it stopped. */
+  resume(id: string): void;
+  /** Tries a failed file again, continuing from what the server already has. */
+  retry(id: string): void;
+  /**
+   * Stops the upload, deletes what was already uploaded from the server and
+   * removes the file. A finished upload is not deleted from the server.
+   */
+  cancel(id: string): void;
   /** Current state. The same object is returned until something changes. */
   getState(): UploaderState;
   /** Calls `listener` after every state change. Returns a function that unsubscribes. */
   subscribe(listener: () => void): () => void;
-  /** Removes one file. An upload in progress is stopped. */
+  /** Removes one file. An upload in progress is stopped, but stays on the server. */
   remove(id: string): void;
   /** Removes all files. Uploads in progress are stopped. */
   clear(): void;
