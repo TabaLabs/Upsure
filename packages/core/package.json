@@ -1,6 +1,6 @@
 {
   "name": "@tabalabs/upsure",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Resumable file uploads for the browser: pause, resume and retry, continuing where the upload stopped. Framework-free client for the tus protocol.",
   "keywords": [
     "upload",

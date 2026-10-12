@@ -1,6 +1,6 @@
 {
   "name": "@tabalabs/upsure-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "React hook and drop-in component for resumable file uploads that continue where they stopped. Accessible, themeable, built on the tus protocol.",
   "keywords": [
     "react",
