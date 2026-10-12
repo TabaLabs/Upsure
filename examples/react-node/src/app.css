@@ -1,0 +1,38 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: #1b1b22;
+}
+
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+
+.page h1 {
+  margin: 0 0 8px;
+  font-size: 1.75rem;
+}
+
+.page p {
+  margin: 0 0 24px;
+  color: #5c5c6b;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #17171c;
+    color: #f1f1f5;
+  }
+
+  .page p {
+    color: #b4b4c2;
+  }
+}
