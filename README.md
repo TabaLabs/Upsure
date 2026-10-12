@@ -6,12 +6,11 @@
 
 [![CI](https://github.com/TabaLabs/upsure/actions/workflows/ci.yml/badge.svg)](https://github.com/TabaLabs/upsure/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![@tabalabs/upsure on npm](https://img.shields.io/npm/v/@tabalabs/upsure?label=%40tabalabs%2Fupsure)](https://www.npmjs.com/package/@tabalabs/upsure)
+[![@tabalabs/upsure-react on npm](https://img.shields.io/npm/v/@tabalabs/upsure-react?label=%40tabalabs%2Fupsure-react)](https://www.npmjs.com/package/@tabalabs/upsure-react)
+[![@tabalabs/upsure-node on npm](https://img.shields.io/npm/v/@tabalabs/upsure-node?label=%40tabalabs%2Fupsure-node)](https://www.npmjs.com/package/@tabalabs/upsure-node)
 
 Upsure is a small set of libraries for file uploads that continue where they stopped after a lost connection, a pause or a page reload.
-
-> **Not on npm yet.** The packages work and are tested, but the first release has not been published. Until then, try Upsure from this repository with the [example app](./examples/react-node).
-
-<!-- demo GIF -->
 
 ## Why Upsure
 
@@ -53,6 +52,7 @@ Upsure is a small set of libraries for file uploads that continue where they sto
 
 - One handler for plain `http` servers and Express
 - Limits on file size and file type
+- A list of websites that are allowed to upload
 - Content check for PNG, JPEG, GIF, WebP and PDF: a file whose content doesn't match its declared type is deleted and rejected
 - An `authorize` function to reject requests
 - A callback when an upload is complete
@@ -60,23 +60,30 @@ Upsure is a small set of libraries for file uploads that continue where they sto
 
 ## Quick start
 
-You need Node 20.19 or newer.
+You need Node 20.19 or newer. The quick start makes two folders: one for the server and one for the React app.
 
-### 1. Install
+### 1. The server
+
+Make a folder for the server and install the server package there:
 
 ```sh
-npm install @tabalabs/upsure-react @tabalabs/upsure-node express
+mkdir upload-server
+cd upload-server
+npm init -y
+npm install @tabalabs/upsure-node express
 ```
 
-### 2. The server
-
-Save this as `server.mjs` and run it with `node server.mjs`:
+Save this as `server.mjs` in that folder:
 
 ```js
 import { createUpsureServer } from "@tabalabs/upsure-node";
 import express from "express";
 
-const upsure = createUpsureServer({ path: "/uploads", directory: "./uploads" });
+const upsure = createUpsureServer({
+  path: "/uploads",
+  directory: "./uploads",
+  allowedOrigins: ["http://localhost:5173"],
+});
 
 const app = express();
 app.all("/uploads", upsure.handle);
@@ -85,11 +92,30 @@ app.all("/uploads/:id", upsure.handle);
 app.listen(3000, () => console.log("Uploads: http://localhost:3000/uploads"));
 ```
 
-Uploaded files are written to the `uploads` folder. Mount the upload routes before any body parser, such as `express.json()`.
+Start it:
 
-### 3. The React component
+```sh
+node server.mjs
+```
 
-```jsx
+- **`allowedOrigins`** lists the websites whose pages may upload. `http://localhost:5173` is where the React app from step 2 runs. Without this option the server accepts uploads from pages on any website. It needs `@tabalabs/upsure-node` 0.2.0 or newer; older versions ignore it.
+- **`directory`** is where files are written. `"./uploads"` is resolved from the folder you start the server from, not from the folder `server.mjs` is in. See [Where files are stored](#where-files-are-stored) for a fixed location.
+- **Body parsers:** mount the upload routes before any body parser, such as `express.json()`.
+
+### 2. The React app
+
+In a second terminal, create a React app with [Vite](https://vite.dev) and install the React package in the app's folder:
+
+```sh
+npm create vite@latest upload-app -- --template react-ts
+cd upload-app
+npm install
+npm install @tabalabs/upsure-react
+```
+
+Replace the contents of `src/App.tsx` with:
+
+```tsx
 import { Upsure } from "@tabalabs/upsure-react";
 import "@tabalabs/upsure-react/styles.css";
 
@@ -105,9 +131,47 @@ export default function App() {
 }
 ```
 
-That's all: drop a file on the page and it uploads, with pause, resume and retry built in.
+Start it:
+
+```sh
+npm run dev
+```
+
+Open <http://localhost:5173> and drop an image or a PDF on the page. It uploads, with pause, resume and retry built in, and the file appears in `upload-server/uploads`.
+
+The two packages go in different places: `@tabalabs/upsure-react` in the app's folder, `@tabalabs/upsure-node` in the server's folder. If your app and server share one folder and one `package.json`, install both there.
 
 Limits set on the client are for quick feedback only. Set `maxFileSize` and `allowedTypes` on the server too; that is where they are enforced.
+
+### TypeScript
+
+All three packages include their own types; there is nothing extra to install for them.
+
+To write the server in TypeScript, use an ESM project (`"type": "module"` in the server's `package.json`), because the examples use `import`, and install Express's types with `npm install -D @types/express`.
+
+Keep `skipLibCheck: true` in your `tsconfig.json`. With `skipLibCheck: false`, TypeScript reports errors that come from a dependency of the tus server (`srvx`), not from Upsure.
+
+## Before production
+
+The quick start is for trying Upsure on your own machine. Before real users upload real files, go through this list:
+
+- [ ] **`allowedOrigins`:** list your site's real address, for example `["https://example.com"]`. Without it, pages on any website can upload to your server. This stops other websites, not other programs: a script can still send requests.
+- [ ] **`authorize`:** check who is uploading. Send a token from the client with the `headers` option and check it here; return `false` to reject the request.
+- [ ] **`maxFileSize`:** set a limit on the server. Without one, a single upload can fill your disk.
+- [ ] **`allowedTypes`:** list the file types you accept. The type and name are sent by the client and can be faked; the content is only checked for PNG, JPEG, GIF, WebP and PDF.
+- [ ] **HTTPS:** serve both the page and the upload endpoint over HTTPS. If a proxy in front of Node handles HTTPS, see the note below.
+- [ ] **Where files are stored:** use a fixed folder outside your code, with enough space, that the web server does not serve directly. See [Where files are stored](#where-files-are-stored).
+
+**HTTPS behind a proxy.** The server builds the upload URL from the request it sees. Behind a proxy such as nginx that handles HTTPS, it sees plain `http`, and the browser then refuses to upload to an `http://` address from an `https://` page. Have the proxy send the `X-Forwarded-Proto` and `X-Forwarded-Host` headers, and tell the tus server to use them:
+
+```js
+import { createUpsureServer } from "@tabalabs/upsure-node";
+
+const upsure = createUpsureServer({ path: "/uploads", directory: "./uploads" });
+upsure.tus.options.respectForwardedHeaders = true;
+```
+
+Only do this behind a proxy you control, because these headers can otherwise be set by anyone.
 
 ## How resume works
 
@@ -156,7 +220,7 @@ document.querySelector("input[type=file]").addEventListener("change", (event) =>
 | `resumeAfterReload` | `boolean` | `true` | Remember unfinished uploads in `localStorage`, so adding the same file again after a reload continues it. |
 | `previews` | `boolean` | `true` | Give image files a `previewUrl`. |
 | `onComplete` | `(file) => void` | none | Called when a file has been fully uploaded. |
-| `onError` | `(file, error) => void` | none | Called when an upload fails for good, after the automatic retries. |
+| `onError` | `(file, error) => void` | none | Called every time a file's status becomes `"error"`: at once when the server rejects the upload or the browser is offline, otherwise after the retries in `retryDelays` have run out. Called again if a later retry of the same file fails too. |
 
 ### Methods
 
@@ -190,7 +254,7 @@ Each entry in `getState().files`:
 | `previewUrl` | `string`, optional | Object URL of an image file. |
 | `url` | `string`, optional | URL of the upload on the server, once it is complete. |
 | `error` | `string`, optional | Why the upload failed, when `status` is `"error"`. |
-| `retryable` | `boolean`, optional | When `status` is `"error"`: `true` if the server never answered (a network problem), `false` if the server rejected the upload. |
+| `retryable` | `boolean`, optional | When `status` is `"error"`: `true` if the server never answered (a network problem), `false` if the server answered with an error. A file with `retryable: true` is retried by itself when the browser comes back online; one with `false` waits for `retry(id)`. |
 
 A rejected file from `addFiles` has the form `{ file, reason }`, where `reason` is `"type"`, `"size"`, `"too-many-files"` or `"empty"`.
 
@@ -303,6 +367,7 @@ It returns:
 | `directory` | `string` | required | Folder the uploaded files are written to. Created if it doesn't exist. |
 | `maxFileSize` | `number` | no limit | Largest accepted file, in bytes. Bigger uploads are rejected with status 413. |
 | `allowedTypes` | `string[]` | all types | Accepted types, in the same form as on the client. Checked against the file name and type the client sends. Others are rejected with status 415. |
+| `allowedOrigins` | `string[]` | every website | Websites whose pages may upload, as origins like `"https://example.com"`. Browsers block pages from other sites. It does not stop programs other than browsers; use `authorize` for that. Needs version 0.2.0 or newer. |
 | `expireAfter` | `number` | 24 hours | How long an unfinished upload is kept, in milliseconds. `0` keeps them forever. |
 | `authorize` | `(request) => boolean` (may be async) | none | Called for every upload request with a web-standard `Request`. Return `false` to reject it with status 401. |
 | `onUploadComplete` | `(file) => void` (may be async) | none | Called once when an upload has been fully received. |
@@ -326,7 +391,7 @@ It returns:
 | `close()` | Stops the cleanup timer. Call it when shutting down. |
 | `tus` | The underlying [tus server](https://github.com/tus/tus-node-server), for anything Upsure doesn't cover. |
 
-A server with limits, auth and a callback:
+A server with limits, an allowed website, auth and a callback:
 
 ```js
 import { createUpsureServer } from "@tabalabs/upsure-node";
@@ -336,12 +401,60 @@ const upsure = createUpsureServer({
   directory: "./uploads",
   maxFileSize: 50 * 1024 * 1024,
   allowedTypes: ["image/*", "application/pdf"],
+  allowedOrigins: ["https://example.com"],
   authorize: (request) => request.headers.get("authorization") === "Bearer my-secret-token",
   onUploadComplete: (file) => console.log(`${file.name} (${file.size} bytes) saved to ${file.path}`),
 });
 ```
 
-Files are stored under their upload id, without an extension. Use `onUploadComplete` to move or rename them.
+### Where files are stored
+
+A relative `directory` such as `"./uploads"` is resolved from the folder you start the server from. Starting the same server from another folder writes to another place. For a fixed location, build the path from the file the server code is in:
+
+```js
+import path from "node:path";
+import { createUpsureServer } from "@tabalabs/upsure-node";
+
+const upsure = createUpsureServer({
+  path: "/uploads",
+  directory: path.resolve(import.meta.dirname, "uploads"),
+});
+```
+
+Each upload is two files in that folder:
+
+| File | What it holds |
+| --- | --- |
+| `<id>` | The content of the upload. It has no extension and grows while the upload is in progress. |
+| `<id>.json` | Information about the upload: the original file name and type the client sent, the full size, and when it was created. |
+
+Don't delete or move either file while an upload is in progress: the server needs both to continue it. Unfinished uploads are removed by the server itself once they are older than `expireAfter`.
+
+The file on disk is named after the upload id, not after the original file. `onUploadComplete` gives you both the original name and the path:
+
+```js
+import { rename, rm } from "node:fs/promises";
+import path from "node:path";
+import { createUpsureServer } from "@tabalabs/upsure-node";
+
+const finished = path.resolve(import.meta.dirname, "finished");
+
+const upsure = createUpsureServer({
+  path: "/uploads",
+  directory: path.resolve(import.meta.dirname, "uploads"),
+  async onUploadComplete(file) {
+    console.log(`${file.name} is stored at ${file.path}`);
+
+    // Optional: move the finished file somewhere else under its original name.
+    await rename(file.path, path.join(finished, `${file.id}-${file.name}`));
+    await rm(`${file.path}.json`);
+  },
+});
+```
+
+`file.name` is the original name with folders and unsafe characters removed. The example puts the id in front because two people can upload files with the same name. The `finished` folder must exist and be on the same disk as `directory`.
+
+Finished uploads are never deleted by the server. If you don't move them, they stay in `directory` as `<id>` and `<id>.json`.
 
 Without Express, pass the handler to Node's own server:
 

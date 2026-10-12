@@ -4,6 +4,8 @@
 
 # @tabalabs/upsure
 
+[![npm](https://img.shields.io/npm/v/@tabalabs/upsure)](https://www.npmjs.com/package/@tabalabs/upsure)
+
 The upload client of [Upsure](https://github.com/TabaLabs/upsure): file uploads that continue where they stopped after a lost connection, a pause or a page reload. Plain TypeScript, no framework.
 
 It speaks the open [tus](https://tus.io) protocol, so it works with [`@tabalabs/upsure-node`](https://github.com/TabaLabs/upsure/tree/main/packages/node) or any other tus server.

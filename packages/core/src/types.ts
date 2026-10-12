@@ -40,7 +40,12 @@ export interface UploaderOptions {
   previews?: boolean;
   /** Called when a file has been fully uploaded. */
   onComplete?: (file: FileState) => void;
-  /** Called when an upload fails for good, after the automatic retries. */
+  /**
+   * Called every time a file's status becomes `"error"`: at once when the
+   * server rejects the upload or the browser is offline, otherwise after the
+   * retries in `retryDelays` have run out. It is called again if a later
+   * retry of the same file fails too.
+   */
   onError?: (file: FileState, error: Error) => void;
 }
 
@@ -66,7 +71,8 @@ export interface FileState {
   error?: string;
   /**
    * Set when `status` is `"error"`: `true` when the server never answered (a
-   * network problem), `false` when the server rejected the upload.
+   * network problem), `false` when the server answered with an error. A file
+   * with `retryable: true` is retried by itself when the browser comes back online.
    */
   retryable?: boolean;
 }

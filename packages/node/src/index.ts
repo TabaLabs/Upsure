@@ -41,6 +41,13 @@ export interface UpsureServerOptions {
    */
   expireAfter?: number;
   /**
+   * Websites whose pages may upload, as origins like `"https://example.com"`.
+   * Browsers block pages from any other site. Without it, pages from every
+   * website may upload. This is not authentication: it does not stop
+   * programs other than browsers. Use `authorize` for that.
+   */
+  allowedOrigins?: string[];
+  /**
    * Called for every upload request (not CORS preflights). Return `false` to
    * reject the request with 401.
    */
@@ -70,6 +77,7 @@ export function createUpsureServer(options: UpsureServerOptions): UpsureServer {
     path: options.path,
     datastore: store,
     maxSize: options.maxFileSize,
+    allowedOrigins: options.allowedOrigins,
 
     async onIncomingRequest(request) {
       if (authorize && (await authorize(request)) === false) {
