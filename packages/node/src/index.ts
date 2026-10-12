@@ -48,6 +48,15 @@ export interface UpsureServerOptions {
    */
   allowedOrigins?: string[];
   /**
+   * Set to `true` when the server runs behind a reverse proxy such as nginx.
+   * The upload URLs it returns then use the protocol and host from the
+   * proxy's `X-Forwarded-Proto` and `X-Forwarded-Host` (or `Forwarded`)
+   * headers, so they stay `https` and keep the public host name. Defaults to
+   * `false`. Only turn it on behind a proxy you control: without one, any
+   * client can set these headers.
+   */
+  trustProxy?: boolean;
+  /**
    * Called for every upload request (not CORS preflights). Return `false` to
    * reject the request with 401.
    */
@@ -78,6 +87,7 @@ export function createUpsureServer(options: UpsureServerOptions): UpsureServer {
     datastore: store,
     maxSize: options.maxFileSize,
     allowedOrigins: options.allowedOrigins,
+    respectForwardedHeaders: options.trustProxy ?? false,
 
     async onIncomingRequest(request) {
       if (authorize && (await authorize(request)) === false) {
