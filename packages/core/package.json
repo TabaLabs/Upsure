@@ -1,9 +1,23 @@
 {
   "name": "@tabalabs/upsure",
-  "version": "0.0.0",
-  "description": "Framework-free client for resumable file uploads (tus).",
+  "version": "0.1.0",
+  "description": "Resumable file uploads for the browser: pause, resume and retry, continuing where the upload stopped. Framework-free client for the tus protocol.",
+  "keywords": [
+    "upload",
+    "file-upload",
+    "resumable",
+    "resumable-upload",
+    "tus",
+    "chunked-upload",
+    "uploader",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "TabaLabs",
+  "homepage": "https://github.com/TabaLabs/upsure/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/TabaLabs/upsure/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TabaLabs/upsure.git",
@@ -26,7 +40,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "engines": {
@@ -38,14 +54,15 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:package": "publint --strict && attw --pack ."
+  },
+  "dependencies": {
+    "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
     "@tabalabs/upsure-node": "workspace:*",
     "@types/node": "^20.19.43",
     "jsdom": "^29.1.1"
-  },
-  "dependencies": {
-    "tus-js-client": "^4.3.1"
   }
 }

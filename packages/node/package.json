@@ -1,9 +1,24 @@
 {
   "name": "@tabalabs/upsure-node",
-  "version": "0.0.0",
-  "description": "Node server for Upsure resumable uploads (tus).",
+  "version": "0.1.0",
+  "description": "Node server for resumable file uploads over the tus protocol, with size and type limits, content checks and auth. Works with http and Express.",
+  "keywords": [
+    "upload",
+    "file-upload",
+    "resumable",
+    "resumable-upload",
+    "tus",
+    "tus-server",
+    "node",
+    "express",
+    "server"
+  ],
   "license": "MIT",
   "author": "TabaLabs",
+  "homepage": "https://github.com/TabaLabs/upsure/tree/main/packages/node#readme",
+  "bugs": {
+    "url": "https://github.com/TabaLabs/upsure/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TabaLabs/upsure.git",
@@ -26,11 +41,13 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19.0"
   },
   "publishConfig": {
     "access": "public"
@@ -38,7 +55,8 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:package": "publint --strict && attw --pack ."
   },
   "dependencies": {
     "@tus/file-store": "^2.1.1",

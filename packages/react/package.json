@@ -1,9 +1,25 @@
 {
   "name": "@tabalabs/upsure-react",
-  "version": "0.0.0",
-  "description": "React hook and drop-in component for Upsure resumable uploads.",
+  "version": "0.1.0",
+  "description": "React hook and drop-in component for resumable file uploads that continue where they stopped. Accessible, themeable, built on the tus protocol.",
+  "keywords": [
+    "react",
+    "upload",
+    "file-upload",
+    "resumable",
+    "resumable-upload",
+    "tus",
+    "dropzone",
+    "drag-and-drop",
+    "react-hook",
+    "react-component"
+  ],
   "license": "MIT",
   "author": "TabaLabs",
+  "homepage": "https://github.com/TabaLabs/upsure/tree/main/packages/react#readme",
+  "bugs": {
+    "url": "https://github.com/TabaLabs/upsure/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TabaLabs/upsure.git",
@@ -27,7 +43,9 @@
     "./styles.css": "./dist/styles.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": [
     "**/*.css"
@@ -41,10 +59,11 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:package": "publint --strict && attw --pack . --exclude-entrypoints styles.css"
   },
   "dependencies": {
-    "@tabalabs/upsure": "workspace:*"
+    "@tabalabs/upsure": "workspace:^"
   },
   "peerDependencies": {
     "react": ">=18"
