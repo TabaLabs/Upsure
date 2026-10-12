@@ -159,19 +159,22 @@ The quick start is for trying Upsure on your own machine. Before real users uplo
 - [ ] **`authorize`:** check who is uploading. Send a token from the client with the `headers` option and check it here; return `false` to reject the request.
 - [ ] **`maxFileSize`:** set a limit on the server. Without one, a single upload can fill your disk.
 - [ ] **`allowedTypes`:** list the file types you accept. The type and name are sent by the client and can be faked; the content is only checked for PNG, JPEG, GIF, WebP and PDF.
-- [ ] **HTTPS:** serve both the page and the upload endpoint over HTTPS. If a proxy in front of Node handles HTTPS, see the note below.
+- [ ] **HTTPS:** serve both the page and the upload endpoint over HTTPS. If a proxy in front of Node handles HTTPS, set `trustProxy: true`; see the note below.
 - [ ] **Where files are stored:** use a fixed folder outside your code, with enough space, that the web server does not serve directly. See [Where files are stored](#where-files-are-stored).
 
-**HTTPS behind a proxy.** The server builds the upload URL from the request it sees. Behind a proxy such as nginx that handles HTTPS, it sees plain `http`, and the browser then refuses to upload to an `http://` address from an `https://` page. Have the proxy send the `X-Forwarded-Proto` and `X-Forwarded-Host` headers, and tell the tus server to use them:
+**HTTPS behind a proxy.** The server builds the upload URL from the request it sees. Behind a proxy such as nginx that handles HTTPS, it sees plain `http`, and the browser then refuses to upload to an `http://` address from an `https://` page. Have the proxy send the `X-Forwarded-Proto` and `X-Forwarded-Host` headers, and tell the server to use them with `trustProxy`:
 
 ```js
 import { createUpsureServer } from "@tabalabs/upsure-node";
 
-const upsure = createUpsureServer({ path: "/uploads", directory: "./uploads" });
-upsure.tus.options.respectForwardedHeaders = true;
+const upsure = createUpsureServer({
+  path: "/uploads",
+  directory: "./uploads",
+  trustProxy: true,
+});
 ```
 
-Only do this behind a proxy you control, because these headers can otherwise be set by anyone.
+Only set `trustProxy` behind a proxy you control, because these headers can otherwise be set by anyone. It needs `@tabalabs/upsure-node` 0.2.0 or newer.
 
 ## How resume works
 
@@ -368,6 +371,7 @@ It returns:
 | `maxFileSize` | `number` | no limit | Largest accepted file, in bytes. Bigger uploads are rejected with status 413. |
 | `allowedTypes` | `string[]` | all types | Accepted types, in the same form as on the client. Checked against the file name and type the client sends. Others are rejected with status 415. |
 | `allowedOrigins` | `string[]` | every website | Websites whose pages may upload, as origins like `"https://example.com"`. Browsers block pages from other sites. It does not stop programs other than browsers; use `authorize` for that. Needs version 0.2.0 or newer. |
+| `trustProxy` | `boolean` | `false` | Set to `true` behind a reverse proxy such as nginx. Upload URLs then use the protocol and host from the proxy's `X-Forwarded-Proto` and `X-Forwarded-Host` headers, so they stay `https`. Needs version 0.2.0 or newer. |
 | `expireAfter` | `number` | 24 hours | How long an unfinished upload is kept, in milliseconds. `0` keeps them forever. |
 | `authorize` | `(request) => boolean` (may be async) | none | Called for every upload request with a web-standard `Request`. Return `false` to reject it with status 401. |
 | `onUploadComplete` | `(file) => void` (may be async) | none | Called once when an upload has been fully received. |
