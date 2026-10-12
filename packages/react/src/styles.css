@@ -1,0 +1,253 @@
+/*
+ * Default look for <Upsure />. Optional: the component also works without it.
+ * Theme it by setting the --upsure-* variables on .upsure or any parent.
+ */
+
+.upsure {
+  --upsure-accent: #7c4dff;
+  --upsure-radius: 10px;
+  --upsure-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --upsure-bg: #ffffff;
+  --upsure-surface: #f6f6f9;
+  --upsure-border: #c9c9d4;
+  --upsure-text: #1b1b22;
+  --upsure-muted: #5c5c6b;
+  --upsure-danger: #b3261e;
+  --upsure-success: #1b6e3c;
+  --upsure-track: #e4e4ec;
+  /* The accent, darkened until it is readable as text on the light surfaces. */
+  --upsure-accent-text: color-mix(in srgb, var(--upsure-accent) 78%, #000);
+  --upsure-fill: var(--upsure-accent);
+
+  display: grid;
+  gap: 12px;
+  color: var(--upsure-text);
+  font-family: var(--upsure-font);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .upsure {
+    --upsure-bg: #17171c;
+    --upsure-surface: #212129;
+    --upsure-border: #4a4a58;
+    --upsure-text: #f1f1f5;
+    --upsure-muted: #b4b4c2;
+    --upsure-danger: #ffb4ab;
+    --upsure-success: #7ddc9c;
+    --upsure-track: #3a3a46;
+    /* On dark surfaces the accent is lightened instead. */
+    --upsure-accent-text: color-mix(in srgb, var(--upsure-accent) 55%, #fff);
+    --upsure-fill: var(--upsure-accent-text);
+  }
+}
+
+.upsure *,
+.upsure *::before,
+.upsure *::after {
+  box-sizing: border-box;
+}
+
+/* Dropzone */
+
+.upsure-dropzone {
+  border: 2px dashed var(--upsure-border);
+  border-radius: var(--upsure-radius);
+  background: var(--upsure-surface);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.upsure-dropzone[data-dragging="true"] {
+  border-style: solid;
+  border-color: var(--upsure-accent-text);
+  background: color-mix(in srgb, var(--upsure-accent) 12%, var(--upsure-bg));
+}
+
+.upsure-dropzone-button {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  padding: 24px 16px;
+  border: 0;
+  border-radius: calc(var(--upsure-radius) - 2px);
+  background: transparent;
+  color: var(--upsure-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.upsure-dropzone-button:hover {
+  color: var(--upsure-accent-text);
+}
+
+.upsure-dropzone-button:disabled {
+  color: var(--upsure-muted);
+  cursor: not-allowed;
+}
+
+.upsure-dropzone[data-disabled] {
+  border-style: dotted;
+}
+
+/* Lists */
+
+.upsure-files,
+.upsure-rejections {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upsure-file,
+.upsure-rejection {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px;
+  border: 1px solid var(--upsure-border);
+  border-radius: var(--upsure-radius);
+  background: var(--upsure-bg);
+}
+
+.upsure-rejection {
+  grid-template-columns: 1fr auto;
+  border-color: var(--upsure-danger);
+}
+
+.upsure-rejection-message {
+  color: var(--upsure-danger);
+  overflow-wrap: anywhere;
+}
+
+/* One file */
+
+.upsure-preview {
+  grid-row: span 2;
+  width: 48px;
+  height: 48px;
+  border-radius: calc(var(--upsure-radius) / 2);
+  object-fit: cover;
+}
+
+.upsure-file-info {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+}
+
+.upsure-file-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.upsure-file-size,
+.upsure-file-status {
+  color: var(--upsure-muted);
+  font-size: 0.875rem;
+}
+
+.upsure-file-status[data-status="error"] {
+  color: var(--upsure-danger);
+}
+
+.upsure-file-status[data-status="complete"] {
+  color: var(--upsure-success);
+}
+
+.upsure-progress {
+  grid-column: 2;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--upsure-track);
+  overflow: hidden;
+}
+
+.upsure-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--upsure-fill);
+  transition: width 0.2s linear;
+}
+
+.upsure-progress[data-status="error"] .upsure-progress-bar {
+  background: var(--upsure-danger);
+}
+
+.upsure-progress[data-status="complete"] .upsure-progress-bar {
+  background: var(--upsure-success);
+}
+
+.upsure-progress[data-status="paused"] .upsure-progress-bar {
+  background: var(--upsure-muted);
+}
+
+.upsure-actions {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Buttons */
+
+.upsure-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--upsure-border);
+  border-radius: calc(var(--upsure-radius) - 2px);
+  background: var(--upsure-bg);
+  color: var(--upsure-text);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.upsure-button:hover {
+  border-color: var(--upsure-accent-text);
+  background: var(--upsure-surface);
+}
+
+.upsure-cancel,
+.upsure-remove {
+  color: var(--upsure-danger);
+}
+
+/* Focus is always visible, for every control. */
+.upsure-button:focus-visible,
+.upsure-dropzone-button:focus-visible {
+  outline: 3px solid var(--upsure-accent-text);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .upsure-actions {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upsure-dropzone,
+  .upsure-button,
+  .upsure-progress-bar {
+    transition: none;
+  }
+}
