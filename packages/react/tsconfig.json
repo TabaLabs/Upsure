@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "types": []
   },
-  "include": ["src", "tsup.config.ts"]
+  "include": ["src", "test", "tsup.config.ts"]
 }
