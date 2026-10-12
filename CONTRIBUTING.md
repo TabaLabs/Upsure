@@ -54,6 +54,18 @@ The same build, typecheck and tests run on GitHub for every pull request, on Nod
 - The README only describes what the code really does.
 - New options are added sparingly. The public API is kept small on purpose.
 
+## Changesets
+
+Versions and changelogs are managed with [Changesets](https://github.com/changesets/changesets). When your pull request changes what a package does, run:
+
+```sh
+pnpm changeset
+```
+
+Pick the packages that changed, choose patch, minor or major, and describe the change in one line. Commit the file it creates in `.changeset`. Changes to tests, docs or tooling don't need one.
+
+`pnpm check:packages` builds the packages and checks them with [publint](https://publint.dev) and [Are the Types Wrong](https://arethetypeswrong.github.io), so imports and types work for ESM, CommonJS and TypeScript users. Run it after changing a `package.json` or the build setup.
+
 ## Branches
 
 Name a branch `type/short-topic`:

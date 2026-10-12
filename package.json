@@ -13,10 +13,17 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:e2e": "pnpm --filter upsure-example-react-node test:e2e",
-    "example": "pnpm build && pnpm --filter upsure-example-react-node dev"
+    "example": "pnpm build && pnpm --filter upsure-example-react-node dev",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish",
+    "check:packages": "pnpm build && pnpm -r check:package"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@changesets/cli": "^2.31.1",
     "@types/node": "^20.19.43",
+    "publint": "^0.3.25",
     "tsup": "^8.5.1",
     "typescript": "~5.9.0",
     "vitest": "^4.1.11"
