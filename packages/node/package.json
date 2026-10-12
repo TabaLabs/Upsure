@@ -1,6 +1,6 @@
 {
   "name": "@tabalabs/upsure-node",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Node server for resumable file uploads over the tus protocol, with size and type limits, content checks and auth. Works with http and Express.",
   "keywords": [
     "upload",
